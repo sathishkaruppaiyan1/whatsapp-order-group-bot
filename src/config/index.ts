@@ -30,6 +30,16 @@ export const config = {
     sheetTabName: process.env.GOOGLE_SHEET_TAB || 'Orders',
   },
 
+  /**
+   * Order statuses that trigger the notification pipeline.
+   * "processing" = confirmed orders (COD placed, or online payment completed).
+   * Pending-payment orders are ignored until they reach a listed status.
+   */
+  notifyStatuses: (process.env.NOTIFY_ORDER_STATUSES || 'processing')
+    .split(',')
+    .map((status) => status.trim().toLowerCase())
+    .filter(Boolean),
+
   whatsapp: {
     groupId: process.env.WHATSAPP_GROUP_ID || '',
     /** Where whatsapp-web.js stores the persistent session. */
