@@ -17,9 +17,17 @@ export interface RawBodyRequest extends Request {
 }
 
 export function verifyWooWebhook(req: RawBodyRequest, res: Response, next: NextFunction): void {
-  // WooCommerce sends a test ping (no signature over real payload logic needed)
-  // when the webhook is first saved — let those through so activation succeeds.
   const signature = req.header('x-wc-webhook-signature');
+  const rawText = req.rawBody ? req.rawBody.toString('utf-8') : '';
+
+  // When a webhook is saved, WooCommerce sends an UNSIGNED activation ping with
+  // a form-encoded body of "webhook_id=<n>". Acknowledge it with 200 so the
+  // webhook activates — it never reaches order processing.
+  if (rawText.startsWith('webhook_id=')) {
+    log.info('WooCommerce webhook activation ping acknowledged');
+    res.status(200).json({ ping: 'ok' });
+    return;
+  }
 
   if (!config.woo.webhookSecret) {
     log.warn('WOO_WEBHOOK_SECRET not set — skipping webhook signature verification');

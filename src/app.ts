@@ -14,15 +14,14 @@ import { whatsAppService } from './services/whatsapp/whatsappService';
 export function createApp(): Application {
   const app = express();
 
-  app.use(
-    express.json({
-      limit: '2mb',
-      verify: (req, _res, buf) => {
-        // Keep the raw body so the webhook signature can be verified.
-        (req as RawBodyRequest).rawBody = buf;
-      },
-    })
-  );
+  const captureRawBody = (req: express.Request, _res: express.Response, buf: Buffer): void => {
+    // Keep the raw body so the webhook signature can be verified.
+    (req as RawBodyRequest).rawBody = buf;
+  };
+
+  app.use(express.json({ limit: '2mb', verify: captureRawBody }));
+  // WooCommerce's webhook activation ping is form-encoded ("webhook_id=<n>").
+  app.use(express.urlencoded({ extended: false, limit: '1mb', verify: captureRawBody }));
 
   // Health check (useful for Railway monitoring).
   app.get('/health', (_req, res) => {
