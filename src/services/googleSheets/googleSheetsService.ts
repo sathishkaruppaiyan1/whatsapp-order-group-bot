@@ -61,11 +61,30 @@ class GoogleSheetsService {
     return JSON.parse(decoded);
   }
 
+  /** Creates the configured tab if the spreadsheet does not have it yet. */
+  private async ensureTabExists(): Promise<void> {
+    const sheets = this.getClient();
+    const meta = await sheets.spreadsheets.get({ spreadsheetId: config.google.sheetId });
+    const tabExists = (meta.data.sheets ?? []).some(
+      (sheet) => sheet.properties?.title === config.google.sheetTabName
+    );
+    if (!tabExists) {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: config.google.sheetId,
+        requestBody: {
+          requests: [{ addSheet: { properties: { title: config.google.sheetTabName } } }],
+        },
+      });
+      log.info(`Created missing sheet tab "${config.google.sheetTabName}"`);
+    }
+  }
+
   /** Writes the header row if the sheet is currently empty. Called at startup. */
   async ensureHeaderRow(): Promise<void> {
     const sheets = this.getClient();
     const range = `${config.google.sheetTabName}!A1:Q1`;
     try {
+      await this.ensureTabExists();
       const existing = await sheets.spreadsheets.values.get({
         spreadsheetId: config.google.sheetId,
         range,

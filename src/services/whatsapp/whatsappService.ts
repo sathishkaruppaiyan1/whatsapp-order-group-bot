@@ -17,7 +17,7 @@ const log = moduleLogger('WhatsApp');
  * Priority: PUPPETEER_EXECUTABLE_PATH (set in Docker/Railway) -> locally
  * installed Chrome/Edge (Windows dev) -> undefined (puppeteer's own Chrome).
  */
-function resolveBrowserPath(): string | undefined {
+export function resolveBrowserPath(): string | undefined {
   if (process.env.PUPPETEER_EXECUTABLE_PATH) return process.env.PUPPETEER_EXECUTABLE_PATH;
   const candidates = [
     'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
@@ -36,10 +36,16 @@ class WhatsAppService {
   private ready = false;
   private reconnectAttempts = 0;
   private shuttingDown = false;
+  private latestQr: string | null = null;
 
   /** True once the client is authenticated and ready to send messages. */
   isReady(): boolean {
     return this.ready;
+  }
+
+  /** Latest login QR payload (null once authenticated). Served by GET /qr. */
+  getLatestQr(): string | null {
+    return this.latestQr;
   }
 
   /** Boots the WhatsApp client. Safe to call once at server startup. */
@@ -72,14 +78,19 @@ class WhatsAppService {
     });
 
     client.on('qr', (qr) => {
-      log.info('QR code received. Scan it with WhatsApp (first login only):');
+      this.latestQr = qr;
+      log.info('QR code received. Open /qr in a browser to scan it (first login only):');
       qrcode.generate(qr, { small: true });
     });
 
-    client.on('authenticated', () => log.info('WhatsApp authenticated (session saved)'));
+    client.on('authenticated', () => {
+      this.latestQr = null;
+      log.info('WhatsApp authenticated (session saved)');
+    });
 
     client.on('ready', () => {
       this.ready = true;
+      this.latestQr = null;
       this.reconnectAttempts = 0;
       log.info('WhatsApp client is ready');
     });
