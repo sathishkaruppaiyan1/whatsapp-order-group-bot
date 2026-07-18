@@ -1,0 +1,10 @@
+node_modules
+dist
+logs
+downloads
+generated
+.wwebjs_auth
+.wwebjs_cache
+.env
+.git
+*.md
