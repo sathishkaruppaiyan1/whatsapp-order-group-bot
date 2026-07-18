@@ -22,28 +22,20 @@ import { googleSheetsService } from './googleSheets/googleSheetsService';
 import { formatOrderMessage } from '../utils/messageFormatter';
 import { withRetry } from '../utils/retry';
 import { deleteFiles } from '../utils/fileUtils';
+import { unmarkOrderProcessed } from '../utils/orderDedup';
 import { moduleLogger } from '../utils/logger';
 import { DeliveryStatus, ProcessedOrder } from '../types';
 
 const log = moduleLogger('OrderProcessor');
 
-/** In-memory guard against duplicate webhook deliveries. */
-const processedOrderIds = new Set<number>();
-const DEDUP_TTL_MS = 10 * 60 * 1000;
-
 class OrderProcessor {
   /**
-   * Entry point called by the webhook controller.
+   * Entry point called by the webhook controller (which claims the order in
+   * the dedup registry first). On failure the order is released again so the
+   * next webhook delivery — e.g. the merchant re-saving the order — retries.
    * Never throws — all failures are logged and contained.
    */
   async processNewOrder(orderId: number): Promise<void> {
-    if (processedOrderIds.has(orderId)) {
-      log.warn(`Order #${orderId} already processed recently — skipping duplicate webhook`);
-      return;
-    }
-    processedOrderIds.add(orderId);
-    setTimeout(() => processedOrderIds.delete(orderId), DEDUP_TTL_MS).unref();
-
     log.info(`===== Processing order #${orderId} =====`);
     let order: ProcessedOrder;
 
@@ -52,7 +44,8 @@ class OrderProcessor {
       order = await wooCommerceService.buildProcessedOrder(orderId);
     } catch (error) {
       log.error(`WooCommerce fetch failed for order #${orderId}: ${(error as Error).message}`);
-      return; // Without order data there is nothing more we can do.
+      unmarkOrderProcessed(orderId); // Nothing announced — allow a retry.
+      return;
     }
 
     try {
@@ -61,6 +54,15 @@ class OrderProcessor {
 
       // --- 4. WhatsApp delivery ---
       const delivery = await this.sendToWhatsApp(order);
+
+      if (delivery.whatsappStatus !== 'SENT') {
+        // Delivery failed (e.g. WhatsApp disconnected). Release the order so
+        // the next status-change webhook can announce it properly.
+        unmarkOrderProcessed(orderId);
+        log.warn(
+          `Order #${order.orderNumber} released for retry — re-save the order in WooCommerce to resend`
+        );
+      }
 
       // --- 5. Google Sheets append (3 attempts) ---
       try {
@@ -74,6 +76,7 @@ class OrderProcessor {
     } catch (error) {
       // Safety net — the pipeline must never take the app down.
       log.error(`Unexpected error processing order #${orderId}: ${(error as Error).message}`);
+      unmarkOrderProcessed(orderId);
     } finally {
       // --- 6. Always clean up temp files ---
       deleteFiles(order.items.flatMap((item) => [item.downloadedImagePath, item.generatedImagePath]));

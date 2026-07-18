@@ -8,27 +8,11 @@
 import { Request, Response } from 'express';
 import { config } from '../config';
 import { orderProcessor } from '../services/orderProcessor';
+import { isOrderProcessed, markOrderProcessed } from '../utils/orderDedup';
 import { moduleLogger } from '../utils/logger';
 import { WooWebhookPayload } from '../types';
 
 const log = moduleLogger('Webhook');
-
-/**
- * Orders already sent to the group (orderId -> first-seen timestamp).
- * "order.updated" fires on every order change, so without this an order
- * would be re-announced on each edit. In-memory: a restart forgets it,
- * which at worst re-announces an order edited right after a redeploy.
- */
-const processedOrders = new Map<number, number>();
-const DEDUP_RETENTION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-
-function wasAlreadyProcessed(orderId: number): boolean {
-  const now = Date.now();
-  for (const [id, seenAt] of processedOrders) {
-    if (now - seenAt > DEDUP_RETENTION_MS) processedOrders.delete(id);
-  }
-  return processedOrders.has(orderId);
-}
 
 export function handleOrderCreated(req: Request, res: Response): void {
   const payload = req.body as WooWebhookPayload;
@@ -58,12 +42,12 @@ export function handleOrderCreated(req: Request, res: Response): void {
     return;
   }
 
-  if (wasAlreadyProcessed(orderId)) {
+  if (isOrderProcessed(orderId)) {
     log.info(`Ignoring ${topic} for order #${orderId}: already announced`);
     res.status(200).json({ received: true, duplicate: true });
     return;
   }
-  processedOrders.set(orderId, Date.now());
+  markOrderProcessed(orderId);
 
   log.info(`Webhook received: ${topic} for order #${orderId} (status: ${status ?? 'unknown'})`);
 
