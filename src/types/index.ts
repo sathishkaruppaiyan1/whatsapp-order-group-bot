@@ -126,6 +126,10 @@ export interface ProcessedOrder {
   email: string;
   address: {
     street: string;
+    /** Address line 1 (house/door number). */
+    street1: string;
+    /** Address line 2 (street/area). */
+    street2: string;
     city: string;
     state: string;
     pincode: string;

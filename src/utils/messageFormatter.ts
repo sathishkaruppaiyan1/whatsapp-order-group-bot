@@ -1,70 +1,61 @@
 /**
- * Formats a processed order into the WhatsApp group message,
- * following the exact layout defined in the project spec.
+ * Formats a processed order into the WhatsApp group message
+ * (shipping-label style, exact layout requested by the store owner).
  */
 import { ProcessedOrder } from '../types';
 
-const DIVIDER = '--------------------------------';
+/** Store name shown under "From". Override with STORE_NAME env var. */
+const STORE_NAME = process.env.STORE_NAME || 'Queenstall';
 
-/** Formats a money value with the order's currency symbol. */
-function money(symbol: string, value: string | number): string {
-  const amount = Number(value);
-  return Number.isFinite(amount) ? `${symbol}${amount.toFixed(2)}` : `${symbol}${value}`;
+/** Shows local numbers without the +91 prefix, e.g. +919787887487 -> 9787887487. */
+function displayPhone(phone: string): string {
+  return phone.replace(/^\+91/, '').trim();
+}
+
+/** Strips the variation suffix (" - Wine, M") — Size/Colour get their own lines. */
+function baseProductName(name: string, color: string, size: string): string {
+  const suffix = ` - ${color}, ${size}`;
+  return name.endsWith(suffix) ? name.slice(0, -suffix.length).trim() : name;
 }
 
 /** Builds the formatted WhatsApp order message. */
 export function formatOrderMessage(order: ProcessedOrder): string {
-  const symbol = order.currencySymbol;
+  const lines: string[] = [`Order ID - #${order.orderNumber}`, ''];
 
-  const lines: string[] = [
-    '🛒 *NEW ORDER*',
-    '',
-    `*Order Number:* #${order.orderNumber}`,
-    `*Customer Name:* ${order.customerName}`,
-    `*Phone Number:* ${order.phone || 'N/A'}`,
-    `*Payment Method:* ${order.paymentMethod}`,
-    `*Shipping Method:* ${order.shippingMethod}`,
-    '',
-    DIVIDER,
-    '*PRODUCTS*',
-    DIVIDER,
-  ];
-
-  for (const item of order.items) {
+  // One block per ordered product.
+  order.items.forEach((item, index) => {
+    if (index > 0) lines.push('');
     lines.push(
-      '',
-      `*${item.productName}*`,
-      `Color: ${item.color}`,
-      `Size: ${item.size}`,
-      `Qty: ${item.quantity}`,
-      `Price: ${money(symbol, item.unitPrice)}`,
-      `Subtotal: ${money(symbol, item.subtotal)}`
+      `Products Name: ${baseProductName(item.productName, item.color, item.size)}`,
+      `Size - ${item.size}`,
+      `Colour - ${item.color}`,
+      `Qty - ${item.quantity}`
     );
+  });
+
+  // Shipping label: From / To.
+  lines.push('', 'From', STORE_NAME, 'To', order.customerName);
+  for (const addressLine of [
+    order.address.street1,
+    order.address.street2,
+    order.address.city.trim(),
+    order.address.state.trim(),
+    order.address.pincode.trim(),
+  ]) {
+    if (addressLine) lines.push(addressLine);
   }
+
+  // Contact line; the customer note usually carries alternate/WhatsApp numbers.
+  const phone = displayPhone(order.phone) || 'N/A';
+  lines.push(
+    '',
+    order.orderNotes ? `Ph.no: ${phone} , Note: ${order.orderNotes}` : `Ph.no: ${phone}`
+  );
 
   lines.push(
     '',
-    DIVIDER,
-    '*Delivery Address*',
-    DIVIDER,
-    order.address.street || 'N/A',
-    order.address.city,
-    order.address.state,
-    order.address.pincode,
-    '',
-    DIVIDER,
-    `*Order Total:* ${money(symbol, order.orderTotal)}`,
-    DIVIDER
+    `Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`
   );
 
-  if (order.orderNotes) {
-    lines.push('', `*Note:* ${order.orderNotes}`);
-  }
-
-  lines.push(
-    '',
-    `_Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}_`
-  );
-
-  return lines.filter((line) => line !== undefined && line !== null).join('\n');
+  return lines.join('\n');
 }

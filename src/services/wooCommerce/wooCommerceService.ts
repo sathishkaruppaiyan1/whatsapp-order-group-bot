@@ -105,6 +105,8 @@ class WooCommerceService {
       email: order.billing.email || '',
       address: {
         street,
+        street1: (shipping.address_1 || '').trim(),
+        street2: (shipping.address_2 || '').trim(),
         city: shipping.city || '',
         state: shipping.state || '',
         pincode: shipping.postcode || '',
