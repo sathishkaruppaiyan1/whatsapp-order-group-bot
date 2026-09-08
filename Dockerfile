@@ -1,5 +1,5 @@
 # WooCommerce Order Automation Bot — Railway production image
-FROM node:20-bullseye-slim
+FROM node:20-bookworm-slim
 
 # System dependencies:
 #  - chromium + libs: required by whatsapp-web.js (puppeteer)
