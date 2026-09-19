@@ -4,7 +4,7 @@ Moves the bot from Railway to your own VPS **without touching the WordPress /
 React sites** already running there. The bot runs in one Docker container,
 listens only on `127.0.0.1:3010`, and nginx forwards a subdomain to it.
 
-Replace `bot.example.com` everywhere below with your real subdomain.
+
 
 ---
 
@@ -23,7 +23,7 @@ At your DNS provider add an **A record**:
 |---|---|---|
 | A | `bot` | `<VPS public IP>` |
 
-Check it resolves before continuing: `nslookup bot.example.com`.
+Check it resolves before continuing: `nslookup bot.queenstall.com`.
 
 ## 2. Install Docker (once)
 
@@ -60,7 +60,7 @@ Fill in the same values you had on Railway:
 
 ```
 NODE_ENV=production
-BASE_URL=https://bot.example.com
+BASE_URL=https://bot.queenstall.com
 WOO_URL=https://yourstore.com
 WOO_CONSUMER_KEY=ck_...
 WOO_CONSUMER_SECRET=cs_...
@@ -92,7 +92,6 @@ curl http://127.0.0.1:3010/health
 
 ```bash
 sudo cp deploy/nginx-bot.conf /etc/nginx/sites-available/bot.conf
-sudo sed -i 's/bot.example.com/bot.YOURDOMAIN.com/' /etc/nginx/sites-available/bot.conf
 sudo ln -s /etc/nginx/sites-available/bot.conf /etc/nginx/sites-enabled/bot.conf
 sudo nginx -t && sudo systemctl reload nginx
 ```
@@ -104,19 +103,19 @@ Get a certificate (certbot is almost certainly already installed for your
 sites; if not: `sudo apt-get install -y certbot python3-certbot-nginx`):
 
 ```bash
-sudo certbot --nginx -d bot.YOURDOMAIN.com
+sudo certbot --nginx -d bot.queenstall.com
 ```
 
 Certbot edits only `bot.conf` and adds the HTTPS block + redirect.
 
-Check from outside: `https://bot.YOURDOMAIN.com/health`.
+Check from outside: `https://bot.queenstall.com/health`.
 
 ## 7. Link WhatsApp (QR scan)
 
 Open in a browser:
 
 ```
-https://bot.YOURDOMAIN.com/qr?key=<WOO_WEBHOOK_SECRET>
+https://bot.queenstall.com/qr?key=<WOO_WEBHOOK_SECRET>
 ```
 
 Phone → WhatsApp → **Settings → Linked devices → Link a device** → scan.
@@ -134,7 +133,7 @@ WooCommerce Admin → **Settings → Advanced → Webhooks** → edit the existi
 webhook → Delivery URL:
 
 ```
-https://bot.YOURDOMAIN.com/webhook/order-created
+https://bot.queenstall.com/webhook/order-created
 ```
 
 Save. The bot logs `Webhook ping received`. Place a test order and watch:
