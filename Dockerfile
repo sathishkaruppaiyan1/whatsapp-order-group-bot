@@ -25,6 +25,8 @@ WORKDIR /app
 
 # Install dependencies first for better build caching.
 COPY package*.json ./
+# Vendored fixes for node_modules (applied by the postinstall hook).
+COPY patches ./patches
 RUN npm ci --include=dev
 
 # Build TypeScript.

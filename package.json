@@ -4,6 +4,7 @@
   "description": "Background automation service: WooCommerce orders -> WhatsApp group + Google Sheets",
   "main": "dist/server.js",
   "scripts": {
+    "postinstall": "patch-package",
     "build": "tsc",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
@@ -35,6 +36,7 @@
     "@types/node": "^22.10.5",
     "@types/qrcode": "^1.5.6",
     "@types/qrcode-terminal": "^0.12.2",
+    "patch-package": "^8.0.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }
