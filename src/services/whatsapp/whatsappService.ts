@@ -5,6 +5,7 @@
  * - Helpers to send images and text messages to the configured group
  */
 import fs from 'fs';
+import path from 'path';
 import { Client, LocalAuth, MessageMedia } from 'whatsapp-web.js';
 import qrcode from 'qrcode-terminal';
 import { config } from '../../config';
@@ -25,6 +26,24 @@ export function resolveBrowserPath(): string | undefined {
     'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
   ];
   return candidates.find((candidate) => fs.existsSync(candidate));
+}
+
+/**
+ * Removes stale Chromium singleton lock files left behind when a previous
+ * container/process was killed mid-session. Without this, Chromium refuses to
+ * start ("The profile appears to be in use by another Chromium process").
+ * Safe to call because only one bot instance ever uses the session directory.
+ */
+function clearStaleChromiumLocks(sessionDir: string): void {
+  const profileDir = path.join(sessionDir, 'session');
+  for (const name of ['SingletonLock', 'SingletonSocket', 'SingletonCookie']) {
+    const file = path.join(profileDir, name);
+    try {
+      fs.rmSync(file, { force: true });
+    } catch (error) {
+      log.warn(`Could not remove ${file}: ${(error as Error).message}`);
+    }
+  }
 }
 
 const RECONNECT_BASE_DELAY_MS = 5000;
@@ -134,6 +153,7 @@ class WhatsAppService {
   }
 
   private createClient(): Client {
+    clearStaleChromiumLocks(config.whatsapp.sessionDir);
     const client = new Client({
       authStrategy: new LocalAuth({ dataPath: config.whatsapp.sessionDir }),
       puppeteer: {
