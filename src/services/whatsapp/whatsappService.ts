@@ -71,6 +71,25 @@ class WhatsAppService {
     return this.latestQr;
   }
 
+  /** Phone number of the linked WhatsApp account (null until ready). */
+  getConnectedNumber(): string | null {
+    const wid = this.client?.info?.wid;
+    return wid ? wid.user : null;
+  }
+
+  /** Lists the groups the linked account is a member of. Served by GET /groups. */
+  async listGroups(): Promise<Array<{ id: string; name: string; participants: number }>> {
+    await this.waitUntilReady();
+    const chats = await this.client!.getChats();
+    return chats
+      .filter((chat) => chat.isGroup)
+      .map((chat) => ({
+        id: chat.id._serialized,
+        name: chat.name,
+        participants: (chat as unknown as { participants?: unknown[] }).participants?.length ?? 0,
+      }));
+  }
+
   /** Boots the WhatsApp client. Safe to call once at server startup. */
   async initialize(): Promise<void> {
     if (this.client) return;

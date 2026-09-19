@@ -28,6 +28,8 @@ export function createApp(): Application {
     res.json({
       status: 'ok',
       whatsappReady: whatsAppService.isReady(),
+      whatsappNumber: whatsAppService.getConnectedNumber(),
+      whatsappGroupId: config.whatsapp.groupId,
       uptimeSeconds: Math.round(process.uptime()),
     });
   });
@@ -63,6 +65,26 @@ export function createApp(): Application {
           `<img src="${dataUrl}" alt="WhatsApp QR">`
       )
     );
+  });
+
+  // Lists the linked account's groups (name + id) so WHATSAPP_GROUP_ID can be
+  // verified without a local script. Same ?key= protection as /qr.
+  app.get('/groups', async (req, res, next) => {
+    if (config.woo.webhookSecret && req.query.key !== config.woo.webhookSecret) {
+      res.status(403).send('Forbidden: add ?key=YOUR_WOO_WEBHOOK_SECRET to the URL');
+      return;
+    }
+    try {
+      const groups = await whatsAppService.listGroups();
+      res.json({
+        connectedNumber: whatsAppService.getConnectedNumber(),
+        configuredGroupId: config.whatsapp.groupId,
+        configuredGroupFound: groups.some((group) => group.id === config.whatsapp.groupId),
+        groups,
+      });
+    } catch (error) {
+      next(error);
+    }
   });
 
   app.use('/webhook', webhookRouter);
