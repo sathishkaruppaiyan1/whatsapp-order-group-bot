@@ -24,8 +24,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "1.0"
-          memory: 1500M
+          # WhatsApp Web's renderer peaks near 1 GB while syncing busy groups;
+          # 1500M got it OOM-killed ~45s after every start.
+          cpus: "2.0"
+          memory: 4G
     logging:
       driver: json-file
       options:

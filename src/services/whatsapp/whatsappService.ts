@@ -214,6 +214,13 @@ class WhatsAppService {
       this.latestQr = null;
       this.reconnectAttempts = 0;
       log.info('WhatsApp client is ready');
+      // A crashed renderer (e.g. OOM-killed) never answers again; restart right
+      // away instead of letting sends hang until the watchdog notices.
+      client.pupPage?.once('error', (error: Error) => {
+        if (this.client !== client) return;
+        log.warn(`WhatsApp page crashed (${error.message}) — restarting client`);
+        void this.restartClient();
+      });
     });
 
     client.on('auth_failure', (message) => {

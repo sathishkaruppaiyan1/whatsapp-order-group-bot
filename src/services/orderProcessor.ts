@@ -117,17 +117,21 @@ class OrderProcessor {
   /** Sends all generated images, then the formatted order text. Retries 3x. */
   private async sendToWhatsApp(order: ProcessedOrder): Promise<DeliveryStatus> {
     const message = formatOrderMessage(order);
+    // Images already delivered survive across retries, so a retry after a
+    // failed text send doesn't post the same images to the group again.
+    const sentImages = new Set<string>();
 
     try {
       await withRetry(
         async () => {
           // Images first (each with a small product caption)...
           for (const item of order.items) {
-            if (item.generatedImagePath && item.imageGenerated) {
+            if (item.generatedImagePath && item.imageGenerated && !sentImages.has(item.generatedImagePath)) {
               await whatsAppService.sendImage(
                 item.generatedImagePath,
                 `${item.productName} | ${item.size} | ${item.color} | Qty: ${item.quantity}`
               );
+              sentImages.add(item.generatedImagePath);
             }
           }
           // ...then the full formatted order message.
