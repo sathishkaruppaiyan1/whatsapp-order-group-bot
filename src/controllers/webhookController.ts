@@ -8,6 +8,7 @@
 import { Request, Response } from 'express';
 import { config } from '../config';
 import { orderProcessor } from '../services/orderProcessor';
+import { googleSheetsService } from '../services/googleSheets/googleSheetsService';
 import { isOrderProcessed, markOrderProcessed } from '../utils/orderDedup';
 import { moduleLogger } from '../utils/logger';
 import { WooWebhookPayload } from '../types';
@@ -33,6 +34,16 @@ export function handleOrderCreated(req: Request, res: Response): void {
 
   const topic = req.header('x-wc-webhook-topic') || 'order.event';
   const status = typeof payload.status === 'string' ? payload.status.toLowerCase() : undefined;
+
+  // Every status change is mirrored into the sheet's "Order Status" column.
+  if (status) {
+    const orderNumber = String(payload.number ?? orderId);
+    setImmediate(() => {
+      googleSheetsService.updateOrderStatus(orderNumber, status).catch((error: Error) => {
+        log.error(`Sheet status update failed for order #${orderNumber}: ${error.message}`);
+      });
+    });
+  }
 
   // Real WooCommerce payloads always carry a status; notify only for
   // confirmed ones. (Manual test payloads without a status pass through.)

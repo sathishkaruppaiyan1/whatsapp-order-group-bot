@@ -121,6 +121,8 @@ export interface ProcessedOrder {
   orderId: number;
   orderNumber: string;
   orderDate: string;
+  /** WooCommerce status slug, e.g. "processing". */
+  status: string;
   customerName: string;
   phone: string;
   email: string;
