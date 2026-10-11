@@ -129,7 +129,7 @@ class OrderProcessor {
             if (item.generatedImagePath && item.imageGenerated && !sentImages.has(item.generatedImagePath)) {
               await whatsAppService.sendImage(
                 item.generatedImagePath,
-                `${item.productName} | ${item.size} | ${item.color} | Qty: ${item.quantity}`
+                `Size: ${item.size} | Color: ${item.color} | Qty: ${item.quantity}`
               );
               sentImages.add(item.generatedImagePath);
             }

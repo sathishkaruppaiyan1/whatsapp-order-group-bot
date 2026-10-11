@@ -12,50 +12,31 @@ function displayPhone(phone: string): string {
   return phone.replace(/^\+91/, '').trim();
 }
 
-/** Strips the variation suffix (" - Wine, M") — Size/Colour get their own lines. */
-function baseProductName(name: string, color: string, size: string): string {
-  const suffix = ` - ${color}, ${size}`;
-  return name.endsWith(suffix) ? name.slice(0, -suffix.length).trim() : name;
-}
-
 /** Builds the formatted WhatsApp order message. */
 export function formatOrderMessage(order: ProcessedOrder): string {
-  const lines: string[] = [`Order ID - #${order.orderNumber}`, ''];
+  const lines: string[] = [`order id - ${order.orderNumber}`];
 
-  // One block per ordered product.
-  order.items.forEach((item, index) => {
-    if (index > 0) lines.push('');
-    lines.push(
-      `Products Name: ${baseProductName(item.productName, item.color, item.size)}`,
-      `Size - ${item.size}`,
-      `Colour - ${item.color}`,
-      `Qty - ${item.quantity}`
-    );
-  });
+  // One size/color line per ordered product.
+  for (const item of order.items) {
+    lines.push(`size - ${item.size} , color - ${item.color}`);
+  }
 
   // Shipping label: From / To.
-  lines.push('', 'From', STORE_NAME, 'To', order.customerName);
+  lines.push('From', STORE_NAME, 'To', order.customerName);
   for (const addressLine of [
     order.address.street1,
     order.address.street2,
     order.address.city.trim(),
     order.address.state.trim(),
     order.address.pincode.trim(),
+    order.address.country.trim(),
   ]) {
     if (addressLine) lines.push(addressLine);
   }
 
   // Contact line; the customer note usually carries alternate/WhatsApp numbers.
   const phone = displayPhone(order.phone) || 'N/A';
-  lines.push(
-    '',
-    order.orderNotes ? `Ph.no: ${phone} , Note: ${order.orderNotes}` : `Ph.no: ${phone}`
-  );
-
-  lines.push(
-    '',
-    `Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`
-  );
+  lines.push(order.orderNotes ? `Ph.no: ${phone} , Note: ${order.orderNotes}` : `Ph.no: ${phone}`);
 
   return lines.join('\n');
 }
