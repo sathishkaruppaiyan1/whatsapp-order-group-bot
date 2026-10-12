@@ -98,7 +98,7 @@ class WooCommerceService {
     return {
       orderId: order.id,
       orderNumber: order.number,
-      orderDate: order.date_created,
+      orderDate: order.date_created_gmt ? `${order.date_created_gmt}Z` : order.date_created,
       status: order.status,
       customerName:
         `${order.billing.first_name} ${order.billing.last_name}`.trim() || 'Unknown Customer',

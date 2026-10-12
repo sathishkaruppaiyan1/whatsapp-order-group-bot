@@ -57,6 +57,8 @@ function columnLetter(index: number): string {
 class GoogleSheetsService {
   private sheets: sheets_v4.Sheets | null = null;
   private statusColumnIndex: number | null = null;
+  /** Serializes row writes so concurrent orders never pick the same row. */
+  private writeQueue: Promise<unknown> = Promise.resolve();
 
   /** Lazily builds the authenticated Sheets client. */
   private getClient(): sheets_v4.Sheets {
@@ -162,7 +164,14 @@ class GoogleSheetsService {
    * Throws on failure so callers can apply the retry policy.
    */
   async appendOrderRows(order: ProcessedOrder, delivery: DeliveryStatus): Promise<void> {
+    const write = this.writeQueue.then(() => this.writeOrderRows(order, delivery));
+    this.writeQueue = write.catch(() => undefined);
+    return write;
+  }
+
+  private async writeOrderRows(order: ProcessedOrder, delivery: DeliveryStatus): Promise<void> {
     const sheets = this.getClient();
+    const tab = config.google.sheetTabName;
     const createdDate = new Date(order.orderDate).toLocaleString('en-IN', {
       timeZone: 'Asia/Kolkata',
     });
@@ -193,15 +202,48 @@ class GoogleSheetsService {
       row[statusIndex] = formatOrderStatus(order.status);
     }
 
-    await sheets.spreadsheets.values.append({
+    // Write directly below the last order row. values.append lets Google guess
+    // where the "table" ends, and that guess started inserting at row 1 once
+    // the tab's frozen rows were changed.
+    const existing = await sheets.spreadsheets.values.get({
       spreadsheetId: config.google.sheetId,
-      range: `${config.google.sheetTabName}!A1`,
+      range: `${tab}!A:${ORDER_NUMBER_COLUMN}`,
+    });
+    const firstRow = (existing.data.values?.length ?? 0) + 1;
+    const lastRow = firstRow + rows.length - 1;
+    await this.ensureRowCapacity(lastRow);
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: config.google.sheetId,
+      range: `${tab}!A${firstRow}:${columnLetter(statusIndex)}${lastRow}`,
       valueInputOption: 'USER_ENTERED',
-      insertDataOption: 'INSERT_ROWS',
       requestBody: { values: rows },
     });
 
-    log.info(`Google Sheets updated: ${rows.length} row(s) appended for order #${order.orderNumber}`);
+    log.info(
+      `Google Sheets updated: ${rows.length} row(s) written at row ${firstRow} for order #${order.orderNumber}`
+    );
+  }
+
+  /** Grows the tab when the next rows would fall past its last grid row. */
+  private async ensureRowCapacity(lastRow: number): Promise<void> {
+    const sheets = this.getClient();
+    const meta = await sheets.spreadsheets.get({
+      spreadsheetId: config.google.sheetId,
+      fields: 'sheets(properties(sheetId,title,gridProperties(rowCount)))',
+    });
+    const props = (meta.data.sheets ?? []).find(
+      (sheet) => sheet.properties?.title === config.google.sheetTabName
+    )?.properties;
+    const rowCount = props?.gridProperties?.rowCount ?? 0;
+    if (!props || lastRow <= rowCount) return;
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: config.google.sheetId,
+      requestBody: {
+        requests: [
+          { appendDimension: { sheetId: props.sheetId, dimension: 'ROWS', length: lastRow - rowCount + 100 } },
+        ],
+      },
+    });
   }
 
   /**

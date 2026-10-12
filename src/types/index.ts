@@ -47,6 +47,8 @@ export interface WooOrder {
   currency: string;
   currency_symbol?: string;
   date_created: string;
+  /** Same moment in UTC (date_created is the store's local time, no zone). */
+  date_created_gmt?: string;
   total: string;
   customer_note: string;
   payment_method: string;
