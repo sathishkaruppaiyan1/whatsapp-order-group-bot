@@ -15,6 +15,7 @@
  *  - Google Sheets failure     -> retry 3x
  *  - Nothing here may crash the application
  */
+import path from 'path';
 import { wooCommerceService } from './wooCommerce/wooCommerceService';
 import { imageGeneratorService } from './imageGenerator/imageGeneratorService';
 import { whatsAppService } from './whatsapp/whatsappService';
@@ -27,6 +28,9 @@ import { moduleLogger } from '../utils/logger';
 import { DeliveryStatus, ProcessedOrder } from '../types';
 
 const log = moduleLogger('OrderProcessor');
+
+/** Posted after each order's details so consecutive orders are easy to tell apart. */
+const ORDER_SEPARATOR_IMAGE = path.join(process.cwd(), 'assets', 'order-separator.jpg');
 
 class OrderProcessor {
   /**
@@ -139,6 +143,14 @@ class OrderProcessor {
         },
         { attempts: 3, label: `WhatsApp send (order #${order.orderNumber})` }
       );
+
+      // Green tick marks the end of this order in the group. Sent outside the
+      // retry so a failure here never re-posts the order itself.
+      try {
+        await whatsAppService.sendImage(ORDER_SEPARATOR_IMAGE);
+      } catch (error) {
+        log.warn(`Order separator image not sent for #${order.orderNumber}: ${(error as Error).message}`);
+      }
 
       const sentTime = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
       log.info(`WhatsApp delivery complete for order #${order.orderNumber}`);

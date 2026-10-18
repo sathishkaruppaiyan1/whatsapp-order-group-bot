@@ -32,6 +32,7 @@ RUN npm ci --include=dev
 # Build TypeScript.
 COPY tsconfig.json ./
 COPY src ./src
+COPY assets ./assets
 RUN npm run build && npm prune --omit=dev
 
 # Runtime directories (also created at boot, but nice to have in the image).
