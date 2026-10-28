@@ -33,6 +33,9 @@ const log = moduleLogger('OrderProcessor');
 const ORDER_SEPARATOR_IMAGE = path.join(process.cwd(), 'assets', 'order-separator.jpg');
 
 class OrderProcessor {
+  /** Orders are posted one at a time so their images and text never interleave. */
+  private whatsAppQueue: Promise<unknown> = Promise.resolve();
+
   /**
    * Entry point called by the webhook controller (which claims the order in
    * the dedup registry first). On failure the order is released again so the
@@ -57,7 +60,9 @@ class OrderProcessor {
       await this.prepareImages(order);
 
       // --- 4. WhatsApp delivery ---
-      const delivery = await this.sendToWhatsApp(order);
+      const send = this.whatsAppQueue.then(() => this.sendToWhatsApp(order));
+      this.whatsAppQueue = send.catch(() => undefined);
+      const delivery = await send;
 
       if (delivery.whatsappStatus !== 'SENT') {
         // Delivery failed (e.g. WhatsApp disconnected). Release the order so
