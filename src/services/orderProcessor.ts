@@ -30,7 +30,7 @@ import { DeliveryStatus, ProcessedOrder } from '../types';
 const log = moduleLogger('OrderProcessor');
 
 /** Posted after each order's details so consecutive orders are easy to tell apart. */
-const ORDER_SEPARATOR_IMAGE = path.join(process.cwd(), 'assets', 'order-separator.jpg');
+const ORDER_SEPARATOR_IMAGE = path.join(process.cwd(), 'assets', 'order-separator.png');
 
 class OrderProcessor {
   /** Orders are posted one at a time so their images and text never interleave. */
