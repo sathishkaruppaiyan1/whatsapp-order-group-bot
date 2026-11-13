@@ -23,7 +23,7 @@ import { googleSheetsService } from './googleSheets/googleSheetsService';
 import { formatOrderMessage } from '../utils/messageFormatter';
 import { withRetry } from '../utils/retry';
 import { deleteFiles } from '../utils/fileUtils';
-import { unmarkOrderProcessed } from '../utils/orderDedup';
+import { markOrderSent, unmarkOrderProcessed } from '../utils/orderDedup';
 import { moduleLogger } from '../utils/logger';
 import { DeliveryStatus, ProcessedOrder } from '../types';
 
@@ -64,7 +64,9 @@ class OrderProcessor {
       this.whatsAppQueue = send.catch(() => undefined);
       const delivery = await send;
 
-      if (delivery.whatsappStatus !== 'SENT') {
+      if (delivery.whatsappStatus === 'SENT') {
+        markOrderSent(orderId); // Delivered once: never announce this order again.
+      } else {
         // Delivery failed (e.g. WhatsApp disconnected). Release the order so
         // the next status-change webhook can announce it properly.
         unmarkOrderProcessed(orderId);
@@ -109,7 +111,8 @@ class OrderProcessor {
           item.downloadedImagePath,
           item.size,
           item.color,
-          `order${order.orderId}-product${item.variationId || item.productId}`
+          `order${order.orderId}-product${item.variationId || item.productId}`,
+          item.quantity
         );
         item.imageGenerated = true;
       } catch (error) {

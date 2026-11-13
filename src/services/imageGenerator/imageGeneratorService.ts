@@ -26,6 +26,7 @@ const BADGE_PADDING_Y = 34;
 const BADGE_RADIUS = 28;
 const SIZE_FONT = 'bold 64px "DejaVu Sans", "Segoe UI", Arial, sans-serif';
 const COLOR_FONT = '600 44px "DejaVu Sans", "Segoe UI", Arial, sans-serif';
+const QTY_FONT = 'bold 52px "DejaVu Sans", "Segoe UI", Arial, sans-serif';
 const LINE_GAP = 14;
 
 class ImageGeneratorService {
@@ -54,7 +55,7 @@ class ImageGeneratorService {
       .toBuffer();
 
     // 2. Render the badge with node-canvas.
-    const badge = this.renderBadge(size.toUpperCase(), color.toUpperCase());
+    const badge = this.renderBadge(size.toUpperCase(), color.toUpperCase(), quantity);
 
     // 3. Composite badge at bottom-center and export high-quality JPEG.
     const badgeLeft = Math.round((IMAGE_SIZE - badge.width) / 2);
@@ -65,7 +66,7 @@ class ImageGeneratorService {
       .jpeg({ quality: JPEG_QUALITY, mozjpeg: true })
       .toFile(outputPath);
 
-    log.info(`Image generated: ${outputPath} (size=${size}, color=${color})`);
+    log.info(`Image generated: ${outputPath} (size=${size}, color=${color}, qty=${quantity})`);
     return outputPath;
   }
 
@@ -117,6 +118,13 @@ class ImageGeneratorService {
     ctx.fillStyle = '#444444';
     ctx.font = COLOR_FONT;
     ctx.fillText(colorText, width / 2, BADGE_PADDING_Y + 64 + LINE_GAP, width - BADGE_PADDING_X);
+
+    // QTY (only when > 1, bold red so it stands out).
+    if (qtyText) {
+      ctx.fillStyle = '#D32F2F';
+      ctx.font = QTY_FONT;
+      ctx.fillText(qtyText, width / 2, BADGE_PADDING_Y + 64 + LINE_GAP + 44 + LINE_GAP, width - BADGE_PADDING_X);
+    }
 
     return { buffer: canvas.toBuffer('image/png'), width, height };
   }
