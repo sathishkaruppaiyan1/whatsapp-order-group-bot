@@ -41,7 +41,8 @@ class ImageGeneratorService {
     sourceImagePath: string,
     size: string,
     color: string,
-    namePrefix: string
+    namePrefix: string,
+    quantity = 1
   ): Promise<string> {
     const outputPath = tempFilePath(config.paths.generated, namePrefix, 'jpg');
 
@@ -73,7 +74,8 @@ class ImageGeneratorService {
   /** Draws the white rounded-rectangle badge (SIZE on top, COLOR below) as a PNG. */
   private renderBadge(
     sizeText: string,
-    colorText: string
+    colorText: string,
+    quantity: number
   ): { buffer: Buffer; width: number; height: number } {
     // Measure text first to size the badge to its content.
     const probe = createCanvas(10, 10).getContext('2d');
@@ -85,7 +87,9 @@ class ImageGeneratorService {
     const textWidth = Math.max(sizeWidth, colorWidth);
     const maxBadgeWidth = IMAGE_SIZE - 120;
     const width = Math.min(Math.ceil(textWidth) + BADGE_PADDING_X * 2, maxBadgeWidth);
-    const height = BADGE_PADDING_Y * 2 + 64 + LINE_GAP + 44;
+    // Quantity line is only shown when more than one piece was ordered.
+    const qtyText = quantity > 1 ? `QTY ${quantity}` : null;
+    const height = BADGE_PADDING_Y * 2 + 64 + LINE_GAP + 44 + (qtyText ? LINE_GAP + 52 : 0);
 
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
