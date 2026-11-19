@@ -55,6 +55,19 @@ class OrderProcessor {
       return;
     }
 
+    // Safety net: the Google Sheet records every order ever delivered. If it
+    // already says SENT, never post this order again (covers a lost/empty
+    // dedup file). If the sheet can't be read, fall back to the local record.
+    try {
+      if (await googleSheetsService.wasOrderSent(order.orderNumber)) {
+        markOrderSent(orderId);
+        log.warn(`Order #${order.orderNumber} is already marked SENT in the sheet — not sending again`);
+        return;
+      }
+    } catch (error) {
+      log.warn(`Sent-check against the sheet failed (${(error as Error).message}) — relying on local record`);
+    }
+
     try {
       // --- 2 & 3. Download images and generate badged versions ---
       await this.prepareImages(order);
@@ -64,9 +77,7 @@ class OrderProcessor {
       this.whatsAppQueue = send.catch(() => undefined);
       const delivery = await send;
 
-      if (delivery.whatsappStatus === 'SENT') {
-        markOrderSent(orderId); // Delivered once: never announce this order again.
-      } else {
+      if (delivery.whatsappStatus !== 'SENT') {
         // Delivery failed (e.g. WhatsApp disconnected). Release the order so
         // the next status-change webhook can announce it properly.
         unmarkOrderProcessed(orderId);
@@ -151,6 +162,10 @@ class OrderProcessor {
         },
         { attempts: 3, label: `WhatsApp send (order #${order.orderNumber})` }
       );
+
+      // Record the delivery permanently right away — before the green tick or
+      // any sheet work — so nothing that fails afterwards can allow a re-send.
+      markOrderSent(order.orderId);
 
       // Green tick marks the end of this order in the group. Sent outside the
       // retry so a failure here never re-posts the order itself.

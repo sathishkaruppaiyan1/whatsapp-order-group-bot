@@ -247,6 +247,29 @@ class GoogleSheetsService {
   }
 
   /**
+   * True if the sheet already holds a row for this order whose WhatsApp
+   * status is SENT. The sheet is a durable record of everything ever posted,
+   * so it backs up the local dedup file.
+   */
+  async wasOrderSent(orderNumber: string): Promise<boolean> {
+    const sheets = this.getClient();
+    const tab = config.google.sheetTabName;
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: config.google.sheetId,
+      range: `${tab}!A:Q`,
+    });
+    const rows = response.data.values ?? [];
+    const statusCol = HEADER_ROW.indexOf('WhatsApp Status');
+    const wanted = String(orderNumber).replace(/^#/, '').trim();
+    return rows.some(
+      (row, index) =>
+        index > 0 &&
+        String(row[HEADER_ROW.indexOf('Order Number')] ?? '').replace(/^#/, '').trim() === wanted &&
+        String(row[statusCol] ?? '').trim().toUpperCase() === 'SENT'
+    );
+  }
+
+  /**
    * Writes the latest WooCommerce status into every row of the given order.
    * Returns the number of rows updated (0 if the order is not in the sheet).
    */
